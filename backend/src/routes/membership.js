@@ -3,9 +3,18 @@ import Stripe from "stripe";
 
 const router = express.Router();
 
-// Create membership checkout session
+// Create membership checkout session for a selected plan
 router.post("/create-membership-session", async (req, res) => {
   try {
+    const { priceId } = req.body;
+
+    // Validate price ID was provided
+    if (!priceId) {
+      return res.status(400).json({
+        error: "Price ID is required",
+      });
+    }
+
     // Validate required environment variables
     if (!process.env.STRIPE_SECRET_KEY) {
       return res.status(500).json({
@@ -13,9 +22,16 @@ router.post("/create-membership-session", async (req, res) => {
       });
     }
 
-    if (!process.env.PRICE_ID_MONTHLY || !process.env.PRICE_ID_YEARLY || !process.env.PRICE_ID_SEMI_ANNUAL) {
-      return res.status(500).json({
-        error: "Stripe price IDs (monthly/yearly/semi-annual) are not configured",
+    // Validate the price ID matches one of our configured prices
+    const validPrices = [
+      process.env.PRICE_ID_MONTHLY,
+      process.env.PRICE_ID_SEMI_ANNUAL,
+      process.env.PRICE_ID_YEARLY,
+    ];
+
+    if (!validPrices.includes(priceId)) {
+      return res.status(400).json({
+        error: "Invalid price ID",
       });
     }
 
@@ -25,21 +41,13 @@ router.post("/create-membership-session", async (req, res) => {
     // Get frontend URL for success/cancel redirects
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-    // Create Stripe Checkout Session with multiple subscription options
+    // Create Stripe Checkout Session with the selected subscription plan
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
-      // Multiple line_items allow customer to choose in Stripe Checkout
+      // Single price selected by user from frontend
       line_items: [
         {
-          price: process.env.PRICE_ID_MONTHLY,
-          quantity: 1,
-        },
-        {
-          price: process.env.PRICE_ID_SEMI_ANNUAL,
-          quantity: 1,
-        },
-        {
-          price: process.env.PRICE_ID_YEARLY,
+          price: priceId,
           quantity: 1,
         },
       ],

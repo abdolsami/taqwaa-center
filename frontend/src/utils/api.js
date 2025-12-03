@@ -5,11 +5,11 @@ const API_BASE_URL =
     : "http://localhost:5000/api");
 
 /**
- * Create a membership checkout session with multiple subscription plans
- * User selects the plan (monthly or yearly) inside Stripe Checkout
+ * Create a membership checkout session for a selected subscription plan
+ * @param {string} priceId - The Stripe price ID (monthly, semi-annual, or yearly)
  * @returns {Promise<{url: string, sessionId: string}>}
  */
-export const createMembershipSession = async () => {
+export const createMembershipSession = async (priceId) => {
   try {
     const response = await fetch(
       `${API_BASE_URL}/checkout/create-membership-session`,
@@ -18,6 +18,7 @@ export const createMembershipSession = async () => {
         headers: {
           "Content-Type": "application/json",
         },
+        body: JSON.stringify({ priceId }),
       }
     );
 
