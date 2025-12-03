@@ -13,9 +13,9 @@ router.post("/create-membership-session", async (req, res) => {
       });
     }
 
-    if (!process.env.STRIPE_PRICE_ID) {
+    if (!process.env.PRICE_ID_MONTHLY || !process.env.PRICE_ID_YEARLY || !process.env.PRICE_ID_SEMI_ANNUAL) {
       return res.status(500).json({
-        error: "Stripe price ID is not configured",
+        error: "Stripe price IDs (monthly/yearly/semi-annual) are not configured",
       });
     }
 
@@ -25,25 +25,40 @@ router.post("/create-membership-session", async (req, res) => {
     // Get frontend URL for success/cancel redirects
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-    // Create Stripe Checkout Session
+    // Create Stripe Checkout Session with multiple subscription options
     const session = await stripe.checkout.sessions.create({
       payment_method_types: ["card"],
+      // Multiple line_items allow customer to choose in Stripe Checkout
       line_items: [
         {
-          price: process.env.STRIPE_PRICE_ID,
+          price: process.env.PRICE_ID_MONTHLY,
+          quantity: 1,
+        },
+        {
+          price: process.env.PRICE_ID_SEMI_ANNUAL,
+          quantity: 1,
+        },
+        {
+          price: process.env.PRICE_ID_YEARLY,
           quantity: 1,
         },
       ],
-      mode: "subscription", // Recurring subscription
+      mode: "subscription",
       success_url: `${frontendUrl}/membership-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/membership-canceled`,
-      metadata: {
-        // Add any custom metadata you want to pass to Zapier
-        source: "taqwa-center-website",
-        membership_type: "standard",
+      // Collect billing address for Zapier integration
+      billing_address_collection: "required",
+      // Always create a customer so we have customer_email in webhook
+      customer_creation: "always",
+      // Allow promo codes
+      allow_promotion_codes: true,
+      subscription_data: {
+        metadata: {
+          source: "taqwa-center-website",
+        },
       },
-      // Customer email can be collected during checkout or passed here
-      // customer_email: req.body.email, // Optional: if you want to pre-fill email
+      // Collect customer name and email
+      customer_email: req.body.email || undefined,
     });
 
     // Return the checkout session URL
@@ -87,12 +102,42 @@ export async function handleStripeWebhook(req, res) {
     case "checkout.session.completed": {
       const session = event.data.object;
       console.log("Checkout session completed:", session.id);
-      // Here you can trigger Zapier or other automations
+
+      // Extract data for Zapier integration
+      const webhookData = {
+        event_type: "checkout.session.completed",
+        session_id: session.id,
+        customer_email: session.customer_email,
+        customer_name: session.customer_details?.name || null,
+        line_items: session.line_items?.data || [],
+        subscription_id: session.subscription,
+        timestamp: new Date().toISOString(),
+      };
+
+      console.log(
+        "Webhook data for Zapier:",
+        JSON.stringify(webhookData, null, 2)
+      );
+      // Zapier webhook URL can be added here if needed
       break;
     }
     case "customer.subscription.created": {
       const subscription = event.data.object;
       console.log("Subscription created:", subscription.id);
+
+      const subscriptionData = {
+        event_type: "customer.subscription.created",
+        subscription_id: subscription.id,
+        customer_id: subscription.customer,
+        price_id: subscription.items.data[0]?.price.id,
+        status: subscription.status,
+        timestamp: new Date().toISOString(),
+      };
+
+      console.log(
+        "Subscription data for Zapier:",
+        JSON.stringify(subscriptionData, null, 2)
+      );
       break;
     }
     default:

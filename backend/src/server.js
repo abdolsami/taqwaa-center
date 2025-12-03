@@ -11,6 +11,10 @@ import membershipRoutes, { handleStripeWebhook } from "./routes/membership.js";
 dotenv.config();
 
 const app = express();
+
+// When running behind a proxy (Render, Heroku, etc.) trust the first proxy
+// so express-rate-limit and other middleware can read the correct client IP from X-Forwarded-For
+app.set("trust proxy", 1);
 const PORT = process.env.PORT || 5000;
 
 // Security: set common HTTP headers
