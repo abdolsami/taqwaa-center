@@ -82,13 +82,8 @@ router.post("/create-membership-session", async (req, res) => {
           plans: priceIds.join(","),
         },
       },
-      // Note: don't send `customer_update.phone` (unsupported). Phone is
-      // collected via `phone_number_collection` and is available on
+      // Phone is collected via `phone_number_collection` and is available on
       // `checkout.session.customer_details.phone` in the webhook.
-      customer_update: {
-        name: "auto",
-        address: "auto",
-      },
     };
 
     const session = await stripe.checkout.sessions.create(sessionParams);
