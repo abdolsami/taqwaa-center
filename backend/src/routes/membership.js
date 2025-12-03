@@ -56,8 +56,6 @@ router.post("/create-membership-session", async (req, res) => {
       cancel_url: `${frontendUrl}/membership-canceled`,
       // Collect billing address for Zapier integration
       billing_address_collection: "required",
-      // Always create a customer so we have customer_email in webhook
-      customer_creation: "always",
       // Allow promo codes
       allow_promotion_codes: true,
       subscription_data: {
@@ -65,8 +63,6 @@ router.post("/create-membership-session", async (req, res) => {
           source: "taqwa-center-website",
         },
       },
-      // Collect customer name and email
-      customer_email: req.body.email || undefined,
     });
 
     // Return the checkout session URL
