@@ -22,18 +22,7 @@ router.post("/create-membership-session", async (req, res) => {
       });
     }
 
-    // Validate the price ID matches one of our configured prices
-    const validPrices = [
-      process.env.PRICE_ID_MONTHLY,
-      process.env.PRICE_ID_SEMI_ANNUAL,
-      process.env.PRICE_ID_YEARLY,
-    ];
-
-    if (!validPrices.includes(priceId)) {
-      return res.status(400).json({
-        error: "Invalid price ID",
-      });
-    }
+    // (Validation moved below to allow array or single price handling)
 
     // Initialize Stripe (deferred to avoid throwing at import time)
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
@@ -41,29 +30,66 @@ router.post("/create-membership-session", async (req, res) => {
     // Get frontend URL for success/cancel redirects
     const frontendUrl = process.env.FRONTEND_URL || "http://localhost:3000";
 
-    // Create Stripe Checkout Session with the selected subscription plan
-    const session = await stripe.checkout.sessions.create({
+    // Support either a single priceId or an array of priceIds so Stripe can present
+    // multiple selectable line items (only allowed when intervals match).
+    const priceIds = Array.isArray(priceId) ? priceId : [priceId];
+
+    // Validate provided price IDs are among our configured environment prices
+    const validPrices = [
+      process.env.PRICE_ID_MONTHLY,
+      process.env.PRICE_ID_SEMI_ANNUAL,
+      process.env.PRICE_ID_YEARLY,
+    ].filter(Boolean);
+
+    const invalid = priceIds.find((p) => !validPrices.includes(p));
+    if (invalid) {
+      return res.status(400).json({ error: "Invalid price ID provided" });
+    }
+
+    // If multiple prices provided, verify their billing intervals match.
+    if (priceIds.length > 1) {
+      const fetched = await Promise.all(
+        priceIds.map((p) => stripe.prices.retrieve(p))
+      );
+      const intervals = fetched.map((f) => f.recurring?.interval || null);
+      const uniqueIntervals = [...new Set(intervals)];
+      if (uniqueIntervals.length > 1) {
+        return res.status(400).json({
+          error:
+            "Cannot create a Checkout session with multiple prices that have different billing intervals. Make sure all selected prices share the same recurring interval.",
+        });
+      }
+    }
+
+    // Build Checkout session params. Note: `customer_creation` is only valid for
+    // `payment` mode in Stripe; for subscription mode Stripe will create a
+    // customer automatically. We still request `customer_update` so any fields
+    // the customer edits in Checkout are saved back to the Stripe Customer.
+    const sessionParams = {
       payment_method_types: ["card"],
-      // Single price selected by user from frontend
-      line_items: [
-        {
-          price: priceId,
-          quantity: 1,
-        },
-      ],
+      line_items: priceIds.map((p) => ({ price: p, quantity: 1 })),
       mode: "subscription",
       success_url: `${frontendUrl}/membership-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/membership-canceled`,
-      // Collect billing address for Zapier integration
-      billing_address_collection: "required",
-      // Allow promo codes
+      // Collect contact and billing info inside Stripe Checkout
+      phone_number_collection: { enabled: true },
+      billing_address_collection: "auto",
+      consent_collection: { promotions: "auto" },
       allow_promotion_codes: true,
       subscription_data: {
         metadata: {
           source: "taqwa-center-website",
+          plans: priceIds.join(","),
         },
       },
-    });
+      customer_update: {
+        name: "auto",
+        address: "auto",
+        phone: "auto",
+      },
+    };
+
+    const session = await stripe.checkout.sessions.create(sessionParams);
 
     // Return the checkout session URL
     res.json({
@@ -104,27 +130,78 @@ export async function handleStripeWebhook(req, res) {
   // Handle the event
   switch (event.type) {
     case "checkout.session.completed": {
+      // The event's session may be minimal; retrieve the full session and line items
       const session = event.data.object;
-      console.log("Checkout session completed:", session.id);
+      console.log("Checkout session completed (webhook):", session.id);
 
-      // Extract data for Zapier integration
-      const webhookData = {
-        event_type: "checkout.session.completed",
-        session_id: session.id,
-        customer_email: session.customer_email,
-        customer_name: session.customer_details?.name || null,
-        line_items: session.line_items?.data || [],
-        subscription_id: session.subscription,
-        timestamp: new Date().toISOString(),
-      };
+      try {
+        const fullSession = await stripe.checkout.sessions.retrieve(
+          session.id,
+          {
+            expand: ["subscription", "customer"],
+          }
+        );
 
-      console.log(
-        "Webhook data for Zapier:",
-        JSON.stringify(webhookData, null, 2)
-      );
-      // Zapier webhook URL can be added here if needed
+        const lineItems = await stripe.checkout.sessions.listLineItems(
+          session.id,
+          {
+            limit: 10,
+          }
+        );
+
+        // If a subscription was created, retrieve subscription items for price IDs
+        let subscription = null;
+        if (fullSession.subscription) {
+          subscription = await stripe.subscriptions.retrieve(
+            fullSession.subscription,
+            {
+              expand: ["items.data.price"],
+            }
+          );
+        }
+
+        // Map data for Zapier / Google Sheets
+        const customerName = fullSession.customer_details?.name || null;
+        const customerEmail = fullSession.customer_details?.email || null;
+        const customerPhone = fullSession.customer_details?.phone || null;
+        const customerId = fullSession.customer || null;
+        const subscriptionId =
+          subscription?.id || fullSession.subscription || null;
+        const planIds = subscription
+          ? subscription.items.data.map((it) => it.price.id)
+          : lineItems.data.map((li) => li.price?.id).filter(Boolean);
+        const paymentTimestamp = fullSession.created
+          ? new Date(fullSession.created * 1000).toISOString()
+          : new Date().toISOString();
+
+        const webhookData = {
+          event_type: "checkout.session.completed",
+          session_id: fullSession.id,
+          customer_id: customerId,
+          customer_name: customerName,
+          customer_email: customerEmail,
+          customer_phone: customerPhone,
+          plan_ids: planIds,
+          subscription_id: subscriptionId,
+          payment_timestamp: paymentTimestamp,
+          raw_session: fullSession,
+        };
+
+        console.log(
+          "Webhook data for Zapier:",
+          JSON.stringify(webhookData, null, 2)
+        );
+        // TODO: POST webhookData to external Zapier URL if configured in env
+      } catch (err) {
+        console.error(
+          "Error enhancing checkout.session.completed webhook:",
+          err
+        );
+      }
+
       break;
     }
+
     case "customer.subscription.created": {
       const subscription = event.data.object;
       console.log("Subscription created:", subscription.id);
@@ -133,7 +210,7 @@ export async function handleStripeWebhook(req, res) {
         event_type: "customer.subscription.created",
         subscription_id: subscription.id,
         customer_id: subscription.customer,
-        price_id: subscription.items.data[0]?.price.id,
+        price_ids: subscription.items.data.map((i) => i.price.id),
         status: subscription.status,
         timestamp: new Date().toISOString(),
       };
@@ -144,6 +221,7 @@ export async function handleStripeWebhook(req, res) {
       );
       break;
     }
+
     default:
       console.log(`Unhandled event type: ${event.type}`);
   }
