@@ -84,7 +84,7 @@ const Hero = () => {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.8, delay: 0.4 }}
-            className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 font-elegant leading-tight"
+            className="text-3xl xs:text-4xl sm:text-5xl md:text-6xl lg:text-7xl xl:text-8xl font-bold text-white mb-4 xs:mb-6 font-elegant leading-tight"
           >
             Taqwa Center
           </motion.h1>
@@ -94,7 +94,7 @@ const Hero = () => {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.8, delay: 0.6 }}
-            className="text-xl sm:text-2xl md:text-3xl text-white/90 mb-8 font-light max-w-3xl mx-auto"
+            className="text-base xs:text-lg sm:text-xl md:text-2xl lg:text-3xl text-white/90 mb-6 xs:mb-8 font-light max-w-3xl mx-auto px-2"
           >
             A place of worship, community, and growth.
           </motion.p>
@@ -110,45 +110,69 @@ const Hero = () => {
               <motion.div
                 initial={{ scale: 0.9, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                className="bg-white rounded-lg p-8 max-w-2xl w-full"
+                className="bg-white rounded-lg p-4 xs:p-6 sm:p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto"
                 onClick={(e) => e.stopPropagation()}
               >
-                <h2 className="text-3xl font-bold text-islamic-green-900 mb-6">
-                  Choose Your Membership Plan
-                </h2>
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
+                <div className="flex items-center justify-between mb-4 xs:mb-6">
+                  <h2 className="text-xl xs:text-2xl sm:text-3xl font-bold text-islamic-green-900">
+                    Choose Your Membership Plan
+                  </h2>
+                  {isLoadingMembership ? (
+                    <div className="flex items-center text-sm text-gray-600">
+                      <svg
+                        className="w-4 h-4 mr-2 animate-spin"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                      >
+                        <circle
+                          cx="12"
+                          cy="12"
+                          r="10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          strokeOpacity="0.25"
+                        ></circle>
+                        <path
+                          d="M22 12a10 10 0 00-10-10"
+                          stroke="currentColor"
+                          strokeWidth="4"
+                          strokeLinecap="round"
+                        ></path>
+                      </svg>
+                      Starting secure checkout...
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => setShowPlanSelector(false)}
+                      className="text-sm text-gray-600 hover:text-gray-900"
+                    >
+                      Close
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex flex-col sm:flex-row sm:flex-wrap gap-4 mb-4 xs:mb-6">
                   {plans.map((plan) => (
                     <motion.button
                       key={plan.id}
-                      whileHover={{ scale: 1.05 }}
+                      whileHover={{ scale: 1.03 }}
                       onClick={() => handleSelectPlan(plan.priceId)}
                       disabled={isLoadingMembership}
-                      className="p-4 border-2 border-islamic-green-600 rounded-lg hover:bg-islamic-green-50 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed"
+                      aria-disabled={isLoadingMembership}
+                      className="flex-1 min-w-[180px] bg-white text-islamic-green-900 border border-islamic-green-200 rounded-lg p-4 sm:p-5 shadow-sm hover:shadow-md transition transform-gpu duration-200 flex flex-col items-center text-center disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                      <div className="text-lg font-semibold text-islamic-green-900">
+                      <div className="text-lg sm:text-xl font-semibold">
                         {plan.label}
-                      </div>
-                      <div className="text-sm text-gray-600 mt-2">
-                        {isLoadingMembership
-                          ? "Processing..."
-                          : "Select this plan"}
                       </div>
                     </motion.button>
                   ))}
                 </div>
-                <button
-                  onClick={() => setShowPlanSelector(false)}
-                  disabled={isLoadingMembership}
-                  className="text-gray-600 hover:text-gray-900 disabled:opacity-50"
-                >
-                  Cancel
-                </button>
               </motion.div>
             </motion.div>
           )}
 
           {/* Buttons */}
-          <div className="flex flex-col sm:flex-row gap-4 justify-center">
+          <div className="flex flex-col xs:flex-row gap-3 xs:gap-4 justify-center px-4">
             <motion.button
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -156,7 +180,7 @@ const Hero = () => {
               whileHover={{ scale: 1.05, y: -2 }}
               whileTap={{ scale: 0.95 }}
               onClick={handleLearnMore}
-              className="px-8 py-4 bg-islamic-gold-500 hover:bg-islamic-gold-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 text-lg"
+              className="px-6 xs:px-8 py-3 xs:py-4 bg-islamic-gold-500 hover:bg-islamic-gold-600 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 text-sm xs:text-base sm:text-lg"
             >
               Learn More
             </motion.button>
@@ -168,7 +192,7 @@ const Hero = () => {
               whileTap={{ scale: 0.95 }}
               onClick={handleBecomeMember}
               disabled={isLoadingMembership}
-              className={`px-8 py-4 bg-islamic-green-600 hover:bg-islamic-green-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 text-lg border-2 border-white/20 ${
+              className={`px-6 xs:px-8 py-3 xs:py-4 bg-islamic-green-600 hover:bg-islamic-green-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300 text-sm xs:text-base sm:text-lg border-2 border-white/20 ${
                 isLoadingMembership ? "opacity-50 cursor-not-allowed" : ""
               }`}
             >

@@ -74,7 +74,12 @@ router.post("/create-membership-session", async (req, res) => {
       // Collect contact and billing info inside Stripe Checkout
       phone_number_collection: { enabled: true },
       billing_address_collection: "auto",
-      consent_collection: { promotions: "auto" },
+      // `consent_collection.promotions` requires you to agree to Stripe's
+      // Checkout Terms of Service in the Stripe Dashboard. Only include it
+      // when explicitly enabled via env var to avoid runtime errors.
+      ...(process.env.STRIPE_ENABLE_PROMO_CONSENT === "true"
+        ? { consent_collection: { promotions: "auto" } }
+        : {}),
       allow_promotion_codes: true,
       subscription_data: {
         metadata: {
