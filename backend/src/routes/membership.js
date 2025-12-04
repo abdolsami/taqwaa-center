@@ -200,28 +200,49 @@ export async function handleStripeWebhook(req, res) {
           : new Date().toLocaleString("en-US");
 
         // Build webhook data with richer fields so Zapier can map reliably
-        const webhookData = {
-          event_type: "checkout.session.completed",
-          session_id: fullSession.id,
-          customer_id: customerId,
-          stripe_id: customerId,
-          customer_name: customerName,
-          customer_email: customerEmail,
-          customer_phone: customerPhone,
-          plan_ids: planIds,
-          plan: planNicknames.join(", "),
-          plan_nicknames: planNicknames,
-          plan_descriptions: planDescriptions,
-          plan_product_names: planProductNames,
-          subscription_id: subscriptionId,
-          payment_timestamp: paymentTimestamp,
-          raw_session: fullSession,
+        // Build a minimal, clean payload for Zapier (only fields Stripe Checkout provides)
+        const zapierPayload = {
+          name: customerName || "",
+          email: customerEmail || "",
+          phone: customerPhone || "",
+          stripe_id: customerId || "",
+          plan: planNicknames.join(", ") || "",
+          date: paymentTimestamp || "",
         };
 
-        console.log(
-          "Webhook data for Zapier:",
-          JSON.stringify(webhookData, null, 2)
-        );
+        console.log("Zapier payload:", JSON.stringify(zapierPayload, null, 2));
+
+        // Forward to Zapier catch hook if configured via ZAPIER_WEBHOOK_URL
+        const zapierUrl = process.env.ZAPIER_WEBHOOK_URL;
+        if (zapierUrl) {
+          try {
+            // Use global fetch if available (Node 18+), otherwise dynamically import node-fetch
+            let fetchFn = globalThis.fetch;
+            if (!fetchFn) {
+              const mod = await import("node-fetch");
+              fetchFn = mod.default;
+            }
+
+            const resp = await fetchFn(zapierUrl, {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(zapierPayload),
+            });
+
+            if (!resp.ok) {
+              const bodyText = await resp.text().catch(() => "<no body>");
+              console.error(
+                `Failed to forward to Zapier: ${resp.status} ${resp.statusText} - ${bodyText}`
+              );
+            } else {
+              console.log("Forwarded webhook payload to Zapier successfully");
+            }
+          } catch (err) {
+            console.error("Error forwarding webhook to Zapier:", err);
+          }
+        } else {
+          console.warn("ZAPIER_WEBHOOK_URL not configured; skipping forward to Zapier.");
+        }
       } catch (err) {
         console.error(
           "Error enhancing checkout.session.completed webhook:",
