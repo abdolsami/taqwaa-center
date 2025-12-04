@@ -241,7 +241,9 @@ export async function handleStripeWebhook(req, res) {
             console.error("Error forwarding webhook to Zapier:", err);
           }
         } else {
-          console.warn("ZAPIER_WEBHOOK_URL not configured; skipping forward to Zapier.");
+          console.warn(
+            "ZAPIER_WEBHOOK_URL not configured; skipping forward to Zapier."
+          );
         }
       } catch (err) {
         console.error(
