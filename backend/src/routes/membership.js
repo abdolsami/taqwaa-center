@@ -61,22 +61,15 @@ router.post("/create-membership-session", async (req, res) => {
       }
     }
 
-    // Build Checkout session params. Note: `customer_creation` is only valid for
-    // `payment` mode in Stripe; for subscription mode Stripe will create a
-    // customer automatically. We still request `customer_update` so any fields
-    // the customer edits in Checkout are saved back to the Stripe Customer.
+    // Build Checkout session params
     const sessionParams = {
       payment_method_types: ["card"],
       line_items: priceIds.map((p) => ({ price: p, quantity: 1 })),
       mode: "subscription",
       success_url: `${frontendUrl}/membership-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/membership-canceled`,
-      // Collect contact and billing info inside Stripe Checkout
       phone_number_collection: { enabled: true },
       billing_address_collection: "auto",
-      // `consent_collection.promotions` requires you to agree to Stripe's
-      // Checkout Terms of Service in the Stripe Dashboard. Only include it
-      // when explicitly enabled via env var to avoid runtime errors.
       ...(process.env.STRIPE_ENABLE_PROMO_CONSENT === "true"
         ? { consent_collection: { promotions: "auto" } }
         : {}),
@@ -87,13 +80,10 @@ router.post("/create-membership-session", async (req, res) => {
           plans: priceIds.join(","),
         },
       },
-      // Phone is collected via `phone_number_collection` and is available on
-      // `checkout.session.customer_details.phone` in the webhook.
     };
 
     const session = await stripe.checkout.sessions.create(sessionParams);
 
-    // Return the checkout session URL
     res.json({
       success: true,
       url: session.url,
@@ -121,7 +111,6 @@ export async function handleStripeWebhook(req, res) {
   let event;
 
   try {
-    // Instantiate Stripe here as well
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
     event = stripe.webhooks.constructEvent(req.body, sig, webhookSecret);
   } catch (err) {
@@ -132,11 +121,11 @@ export async function handleStripeWebhook(req, res) {
   // Handle the event
   switch (event.type) {
     case "checkout.session.completed": {
-      // The event's session may be minimal; retrieve the full session and line items
       const session = event.data.object;
       console.log("Checkout session completed (webhook):", session.id);
 
       try {
+        const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
         const fullSession = await stripe.checkout.sessions.retrieve(
           session.id,
           {
@@ -151,39 +140,79 @@ export async function handleStripeWebhook(req, res) {
           }
         );
 
-        // If a subscription was created, retrieve subscription items for price IDs
+        // Retrieve subscription with expanded price and product data when available
         let subscription = null;
         if (fullSession.subscription) {
           subscription = await stripe.subscriptions.retrieve(
             fullSession.subscription,
             {
-              expand: ["items.data.price"],
+              expand: ["items.data.price.product", "items.data.price"],
             }
           );
         }
 
-        // Map data for Zapier / Google Sheets
+        // Extract customer details
         const customerName = fullSession.customer_details?.name || null;
         const customerEmail = fullSession.customer_details?.email || null;
         const customerPhone = fullSession.customer_details?.phone || null;
         const customerId = fullSession.customer || null;
         const subscriptionId =
           subscription?.id || fullSession.subscription || null;
-        const planIds = subscription
-          ? subscription.items.data.map((it) => it.price.id)
-          : lineItems.data.map((li) => li.price?.id).filter(Boolean);
-        const paymentTimestamp = fullSession.created
-          ? new Date(fullSession.created * 1000).toISOString()
-          : new Date().toISOString();
 
+        // Extract plan IDs and gather richer plan info (nickname, description, product name)
+        let planIds = [];
+        let planNicknames = [];
+        let planDescriptions = [];
+        let planProductNames = [];
+
+        if (subscription) {
+          planIds = subscription.items.data.map((it) => it.price.id);
+          subscription.items.data.forEach((it) => {
+            const price = it.price || {};
+            const product = price.product || {};
+            const nickname = price.nickname || null;
+            const description = price.description || null;
+            const productName = product.name || null;
+
+            planNicknames.push(nickname || price.id);
+            planDescriptions.push(description || "");
+            planProductNames.push(productName || "");
+          });
+        } else {
+          // For one-off line items (no subscription), fetch price objects to get descriptions/product
+          const ids = lineItems.data.map((li) => li.price?.id).filter(Boolean);
+          planIds = ids;
+          if (ids.length) {
+            const fetchedPrices = await Promise.all(
+              ids.map((p) => stripe.prices.retrieve(p, { expand: ["product"] }))
+            );
+            fetchedPrices.forEach((price) => {
+              const product = price.product || {};
+              planNicknames.push(price.nickname || price.id);
+              planDescriptions.push(price.description || "");
+              planProductNames.push(product.name || "");
+            });
+          }
+        }
+
+        const paymentTimestamp = fullSession.created
+          ? new Date(fullSession.created * 1000).toLocaleString("en-US")
+          : new Date().toLocaleString("en-US");
+
+        // Build webhook data with richer fields so Zapier can map reliably
         const webhookData = {
           event_type: "checkout.session.completed",
           session_id: fullSession.id,
           customer_id: customerId,
+          stripe_id: customerId,
           customer_name: customerName,
           customer_email: customerEmail,
           customer_phone: customerPhone,
           plan_ids: planIds,
+          plan: planNicknames.join(", "),
+          plan_nicknames: planNicknames,
+          plan_descriptions: planDescriptions,
+          plan_product_names: planProductNames,
           subscription_id: subscriptionId,
           payment_timestamp: paymentTimestamp,
           raw_session: fullSession,
@@ -193,7 +222,6 @@ export async function handleStripeWebhook(req, res) {
           "Webhook data for Zapier:",
           JSON.stringify(webhookData, null, 2)
         );
-        // TODO: POST webhookData to external Zapier URL if configured in env
       } catch (err) {
         console.error(
           "Error enhancing checkout.session.completed webhook:",
