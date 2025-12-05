@@ -151,7 +151,7 @@ const Hero = () => {
                     <motion.button
                       key={plan.id}
                       whileHover={{ scale: 1.03 }}
-                      onClick={() => handleSelectPlan(plan.priceId)}
+                      onClick={() => handleSelectPlan(plan.id)}
                       disabled={isLoadingMembership}
                       aria-disabled={isLoadingMembership}
                       className="flex-1 min-w-[180px] bg-white text-islamic-green-900 border border-islamic-green-200 rounded-lg p-4 sm:p-5 shadow-sm hover:shadow-md transition transform-gpu duration-200 flex flex-col items-center text-center disabled:opacity-50 disabled:cursor-not-allowed"

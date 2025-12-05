@@ -46,12 +46,10 @@ router.post("/create-membership-session", async (req, res) => {
     res.json({ success: true, url: session.url, sessionId: session.id });
   } catch (error) {
     console.error("Stripe Checkout Session Error:", error);
-    res
-      .status(500)
-      .json({
-        error: "Failed to create checkout session",
-        message: error.message,
-      });
+    res.status(500).json({
+      error: "Failed to create checkout session",
+      message: error.message,
+    });
   }
 });
 
@@ -96,7 +94,6 @@ export async function handleStripeWebhook(req, res) {
             limit: 10,
           }
         );
-
 
         // Retrieve subscription with expanded price data
         let subscription = null;
