@@ -11,17 +11,14 @@ const Hero = () => {
     {
       id: "monthly",
       label: "Monthly",
-      priceId: import.meta.env.VITE_PRICE_ID_MONTHLY,
     },
     {
-      id: "semi-annual",
+      id: "six_months",
       label: "6 Months",
-      priceId: import.meta.env.VITE_PRICE_ID_SEMI_ANNUAL,
     },
     {
       id: "yearly",
       label: "Yearly",
-      priceId: import.meta.env.VITE_PRICE_ID_YEARLY,
     },
   ];
 
@@ -36,16 +33,14 @@ const Hero = () => {
     setShowPlanSelector(true);
   };
 
-  const handleSelectPlan = async (priceId) => {
-    if (!priceId) {
-      alert("Price ID not configured. Please contact support.");
+  const handleSelectPlan = async (plan) => {
+    if (!plan) {
+      alert("Please select a plan.");
       return;
     }
-
     setIsLoadingMembership(true);
-
     try {
-      const { url } = await createMembershipSession(priceId);
+      const { url } = await createMembershipSession(plan);
       if (url) {
         window.location.href = url;
       } else {
