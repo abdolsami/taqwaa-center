@@ -4,10 +4,7 @@ import NavBar from "../components/NavBar";
 import Footer from "../components/Footer";
 
 const MembershipSuccess = () => {
-  const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-
-  const sessionId = searchParams.get("session_id");
 
   return (
     <div className="min-h-screen flex flex-col">
@@ -58,18 +55,20 @@ const MembershipSuccess = () => {
           </p>
 
           {/* Session ID (optional, for reference) */}
-          {sessionId && (
-            <p className="text-sm text-gray-500 mb-8 px-4 py-3 bg-gray-200 rounded-lg font-mono break-all">
-              Session ID: {sessionId}
-            </p>
-          )}
 
           {/* Manual Action */}
           <motion.button
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.6 }}
-            onClick={() => navigate("/")}
+            onClick={() => {
+              try {
+                navigate("/");
+              } catch (err) {
+                // fallback: reload home if navigation fails
+                window.location.href = "/";
+              }
+            }}
             className="px-8 py-3 bg-islamic-green-600 hover:bg-islamic-green-700 text-white font-semibold rounded-lg shadow-lg hover:shadow-xl transition-all duration-300"
           >
             Return to Home

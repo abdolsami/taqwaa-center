@@ -23,14 +23,19 @@ export const createMembershipSession = async (plan) => {
     );
 
     if (!response.ok) {
-      const error = await response.json();
-      throw new Error(error.message || "Failed to create checkout session");
+      let errorMsg = "Failed to create checkout session";
+      try {
+        const error = await response.json();
+        if (error && error.error) errorMsg = error.error;
+        else if (error && error.message) errorMsg = error.message;
+      } catch {}
+      throw new Error(errorMsg);
     }
 
     const data = await response.json();
     return data;
   } catch (error) {
     console.error("Error creating membership session:", error);
-    throw error;
+    throw error instanceof Error ? error : new Error("Unknown error");
   }
 };

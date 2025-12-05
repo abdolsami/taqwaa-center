@@ -151,11 +151,11 @@ const NavBar = () => {
             >
               <img
                 src="/images/taqwa-center-logo.jpeg"
-                alt="Taqwa Center Logo"
+                alt="Taqwaa Center Logo"
                 className="h-10 xs:h-12 w-10 xs:w-12 object-contain"
               />
               <span className="text-lg xs:text-2xl font-bold text-gradient font-elegant hidden xs:inline">
-                Taqwa Center
+                Taqwaa Center
               </span>
             </motion.a>
 

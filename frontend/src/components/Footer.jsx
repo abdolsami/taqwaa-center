@@ -33,7 +33,7 @@ const Footer = () => {
             className="lg:col-span-1"
           >
             <h3 className="text-2xl font-bold font-elegant mb-4">
-              Taqwa Center
+              Taqwaa Center
             </h3>
             <p className="text-gray-300 text-sm leading-relaxed">
               A place of worship, community, and growth. Serving our community
@@ -141,7 +141,7 @@ const Footer = () => {
         >
           <div className="flex flex-col md:flex-row justify-center items-center">
             <p className="text-gray-400 text-sm">
-              © {currentYear} Taqwa Center. All rights reserved.
+              © {currentYear} Taqwaa Center. All rights reserved.
             </p>
           </div>
         </motion.div>
