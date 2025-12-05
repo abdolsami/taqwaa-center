@@ -28,7 +28,6 @@ router.post("/create-membership-session", async (req, res) => {
       line_items: [{ price: selectedPriceId, quantity: 1 }],
       mode: "subscription",
       phone_number_collection: { enabled: true },
-      customer_creation: "always",
       success_url: `${frontendUrl}/membership-success?session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${frontendUrl}/membership-canceled`,
       billing_address_collection: "auto",
