@@ -7,6 +7,17 @@ const router = express.Router();
 router.post("/create-membership-session", async (req, res) => {
   try {
     const { plan } = req.body;
+
+    // Debug logging
+    console.log("📝 Membership request received for plan:", plan);
+    console.log(
+      "🔐 STRIPE_SECRET_KEY configured:",
+      !!process.env.STRIPE_SECRET_KEY
+    );
+    console.log("💰 STRIPE_PRICE_MONTHLY:", process.env.STRIPE_PRICE_MONTHLY);
+    console.log("💰 STRIPE_PRICE_6M:", process.env.STRIPE_PRICE_6M);
+    console.log("💰 STRIPE_PRICE_YEARLY:", process.env.STRIPE_PRICE_YEARLY);
+
     const priceMap = {
       monthly: process.env.STRIPE_PRICE_MONTHLY,
       six_months: process.env.STRIPE_PRICE_6M,
@@ -14,9 +25,18 @@ router.post("/create-membership-session", async (req, res) => {
     };
     const selectedPriceId = priceMap[plan];
     if (!selectedPriceId) {
-      return res.status(400).json({ error: "Invalid plan selected" });
+      console.error(
+        "❌ Invalid plan selected:",
+        plan,
+        "Available plans:",
+        Object.keys(priceMap)
+      );
+      return res
+        .status(400)
+        .json({ error: "Invalid plan selected", received: plan });
     }
     if (!process.env.STRIPE_SECRET_KEY) {
+      console.error("❌ Stripe secret key is not configured");
       return res
         .status(500)
         .json({ error: "Stripe secret key is not configured" });
