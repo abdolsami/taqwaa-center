@@ -135,9 +135,12 @@ export async function handleStripeWebhook(req, res) {
           plan = subscription.items.data[0].price.id;
         }
 
-        const paymentTimestamp = fullSession.created
-          ? new Date(fullSession.created * 1000).toLocaleString("en-US")
-          : new Date().toLocaleString("en-US");
+        // Format date as ISO string (YYYY-MM-DD HH:MM:SS) for proper Zapier/Sheets handling
+        const paymentDate = fullSession.created
+          ? new Date(fullSession.created * 1000)
+          : new Date();
+        
+        const dateJoined = paymentDate.toISOString().replace('T', ' ').split('.')[0];
 
         // Build minimal payload for Zapier
         const zapierPayload = {
@@ -146,7 +149,7 @@ export async function handleStripeWebhook(req, res) {
           phone: customerPhone,
           plan,
           stripe_id: customerId,
-          date: paymentTimestamp,
+          date_joined: dateJoined,
         };
 
         console.log("Zapier payload:", JSON.stringify(zapierPayload, null, 2));
